@@ -28,15 +28,43 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
-
+/**
+ * Author:  ZengLiang
+ * Email: zengliang@huya.com
+ * Date:  2019-10-30 20:00
+ * Description:
+ */
 public class AccessibilityNodeInfoDumper {
 
     private static final String TAG = AccessibilityNodeInfoDumper.class.getSimpleName();
+    private static ExecutorService cachedThreadPool = Executors.newCachedThreadPool();
     private static final String[] NAF_EXCLUDED_CLASSES = new String[]{
             android.widget.GridView.class.getName(), android.widget.GridLayout.class.getName(),
             android.widget.ListView.class.getName(), android.widget.TableLayout.class.getName()
     };
+
+    public static void dumpWindowHierarchy(AccessibilityNodeInfo[] windowRoots, File dumpFile, int width, int height) throws IOException {
+        FileWriter writer = new FileWriter(dumpFile);
+        StringWriter stringWriter = new StringWriter();
+        XmlSerializer serializer = Xml.newSerializer();
+        serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
+        serializer.setOutput(stringWriter);
+        serializer.startDocument("UTF-8", true);
+        serializer.startTag("", "hierarchy");
+        serializer.attribute("", "rotation", Integer.toString(1));
+        int len$ = windowRoots.length;
+        for (int i$ = 0; i$ < len$; ++i$) {
+            AccessibilityNodeInfo root = windowRoots[i$];
+            dumpNodeRec(root, serializer, 0, width, height);
+        }
+        serializer.endTag("", "hierarchy");
+        serializer.endDocument();
+        writer.write(stringWriter.toString());
+        writer.close();
+    }
 
     /**
      * Using {@link AccessibilityNodeInfo} this method will walk the layout hierarchy
@@ -80,20 +108,19 @@ public class AccessibilityNodeInfoDumper {
         final long startTime = SystemClock.uptimeMillis();
         try {
             FileWriter writer = new FileWriter(dumpFile);
-            XmlSerializer serializer = Xml.newSerializer();
             StringWriter stringWriter = new StringWriter();
+            XmlSerializer serializer = Xml.newSerializer();
+            serializer.setFeature("http://xmlpull.org/v1/doc/features.html#indent-output", true);
             serializer.setOutput(stringWriter);
             serializer.startDocument("UTF-8", true);
-            serializer.startTag("", "WindowRoots");
+            serializer.startTag("", "hierarchy");
+            serializer.attribute("", "rotation", Integer.toString(1));
             for (int i = 0; i < windowRoots.length; i++) {
                 final long singleStartTime = SystemClock.uptimeMillis();
-                serializer.startTag("", "hierarchy");
-                serializer.attribute("", "rotation", Integer.toString(i));
                 dumpNodeRec(windowRoots[i], serializer, 0, width, height);
-                serializer.endTag("", "hierarchy");
                 Log.w(TAG, "Fetch single time: " + (SystemClock.uptimeMillis() - singleStartTime) + "ms");
             }
-            serializer.endTag("", "WindowRoots");
+            serializer.endTag("", "hierarchy");
             serializer.endDocument();
             writer.write(stringWriter.toString());
             writer.close();
@@ -109,7 +136,7 @@ public class AccessibilityNodeInfoDumper {
      * and generates an xml dump into the /data/local/window_dump.xml
      *
      * @param root     The root accessibility node.
-     * @param rotation The rotaion of current display
+     * @param rotation The rotation of current display
      * @param width    The pixel width of current display
      * @param height   The pixel height of current display
      */
@@ -133,7 +160,7 @@ public class AccessibilityNodeInfoDumper {
      *
      * @param root     The root accessibility node.
      * @param dumpFile The file to dump to.
-     * @param rotation The rotaion of current display
+     * @param rotation The rotation of current display
      * @param width    The pixel width of current display
      * @param height   The pixel height of current display
      */

@@ -16,8 +16,12 @@
 package com.zxs.common.utils.accessibility;
 
 import android.accessibilityservice.AccessibilityService;
+import android.content.Context;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.Build;
+import android.view.Display;
+import android.view.WindowManager;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.view.accessibility.AccessibilityWindowInfo;
 
@@ -25,11 +29,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+
 /**
- * This class contains static helper methods to work with
+ * Author:  ZengLiang
+ * Email: zengliang@huya.com
+ * Date:  2019-10-30 20:39
+ * Description:* This class contains static helper methods to work with
  * {@link AccessibilityNodeInfo}
  */
-public class AccessibilityNodeInfoHelper {
+class AccessibilityNodeInfoHelper {
 
     /**
      * Returns the node's bounds clipped to the size of the display
@@ -39,24 +47,29 @@ public class AccessibilityNodeInfoHelper {
      * @param height pixel height of the display
      * @return null if node is null, else a Rect containing visible bounds
      */
-    public static Rect getVisibleBoundsInScreen(AccessibilityNodeInfo node, int width, int height) {
+    static Rect getVisibleBoundsInScreen(AccessibilityNodeInfo node, int width, int height) {
         if (node == null) {
             return null;
-        }
-        // targeted node's bounds
-        Rect nodeRect = new Rect();
-        node.getBoundsInScreen(nodeRect);
-
-        Rect displayRect = new Rect();
-        displayRect.top = 0;
-        displayRect.left = 0;
-        displayRect.right = width;
-        displayRect.bottom = height;
-
-        if (nodeRect.intersect(displayRect)) {
-            return nodeRect;
         } else {
-            return new Rect();
+            Rect nodeRect = new Rect();
+            node.getBoundsInScreen(nodeRect);
+
+            Rect displayRect = new Rect();
+            displayRect.top = 0;
+            displayRect.left = 0;
+            displayRect.right = width;
+            displayRect.bottom = height;
+
+            nodeRect.intersect(displayRect);
+            if (Build.VERSION.SDK_INT >= 21) {
+                Rect window = new Rect();
+                if (node.getWindow() != null) {
+                    node.getWindow().getBoundsInScreen(window);
+                    nodeRect.intersect(window);
+                }
+            }
+
+            return nodeRect;
         }
     }
 
@@ -71,20 +84,46 @@ public class AccessibilityNodeInfoHelper {
         // Start with the active window, which seems to sometimes be missing from the list returned
         // by the UiAutomation.
         AccessibilityNodeInfo activeRoot = accessibilityService.getRootInActiveWindow();
-        roots.add(activeRoot);
+        if (activeRoot != null) {
+            roots.add(activeRoot);
+        }
         // Support multi-window searches for API level 21 and up.
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
             List<AccessibilityWindowInfo> windows = accessibilityService.getWindows();
             if (windows != null && windows.size() > 0) {
                 for (AccessibilityWindowInfo window : windows) {
                     AccessibilityNodeInfo root = window.getRoot();
-                    if (root == null) {
-                        continue;
+                    if (root != null) {
+                        roots.add(root);
                     }
-                    roots.add(root);
                 }
             }
         }
         return roots.toArray(new AccessibilityNodeInfo[roots.size()]);
+    }
+
+    /**
+     * Returns the dimensions of the display in pixels.
+     *
+     * @param context The context that will be used to retrieve system information
+     * @return The {@link Point} used to store the dimensions of the display
+     */
+    public static Point getScreenSize(Context context) {
+        Point screenPoint = new Point();
+        Display windowDisplay = getDisplay(context);
+        if (windowDisplay != null) {
+            windowDisplay.getSize(screenPoint);
+        }
+        return screenPoint;
+    }
+
+    private static Display getDisplay(Context context) {
+        final WindowManager windowManager =
+            (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        if (windowManager != null) {
+            return windowManager.getDefaultDisplay();
+        } else {
+            return null;
+        }
     }
 }
